@@ -8,7 +8,6 @@ import sys
 import json
 import csv
 import pandas as pd
-import util
 import uszipcode
 
 YEARS = [2017, 2018]
