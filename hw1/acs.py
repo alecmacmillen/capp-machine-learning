@@ -5,8 +5,6 @@ Alec MacMillen
 """
 
 import sys
-import json
-import csv
 import pandas as pd
 
 FEATURE_DICT = {"DP03_0062E":"med_hhinc",
@@ -14,53 +12,71 @@ FEATURE_DICT = {"DP03_0062E":"med_hhinc",
                 "DP05_0038PE":"pct_blk",
                 "DP04_0089E":"med_unitval"}
 
-STATE = '17'
-COUNTY = '031'
-CRIME_PATH = 'crime_full.csv'
+CRIME_DATA = "all_crime_stats.csv"
 
-def pull_acs_data(state=STATE, county=COUNTY):
+
+def pull_acs_data(features=FEATURE_DICT):
     '''
+    Pull down ACS data by reading a JSON request from the ACS API with defined
+    features, convert first row of data to header, rename columns with labels
+    that are descriptive.
+
+    Inputs:
+      features (dict): dictionary mapping column names as they appear in 
+        ACS data to more descriptive names
+
+    Returns:
+      acs_new (pandas df): summary ACS statistics for selected fields at the
+        zip code level. Includes all zip codes in the US.
     '''
     url = "https://api.census.gov/data/2017/acs/acs5/profile?get="
-    att = ','.join(FEATURE_DICT)
+    att = ','.join(features)
     url += att
-    url += "&for=tract:*&in=state:" + state
-    url += "&in=county:" + county
+    url += "&for=zip%20code%20tabulation%20area:*"
 
     acs_df = pd.read_json(url)
     headers = acs_df.iloc[0]
     acs_new = acs_df[1:]
     acs_new.columns = headers
 
-    acs_new.rename(index=str, columns=FEATURE_DICT, inplace=True)
-    acs_new['tract'] = acs_new['tract'].str[:4]
+    acs_new.rename(index=str, columns=features, inplace=True)
+    acs_new.rename(
+        columns={'zip code tabulation area':'zipcode'}, inplace=True)
 
     return acs_new
 
 
-def merge_on_tract(crime_data=CRIME_PATH):
+def go(args):
     '''
+    Pull down ACS data and merge it on to existing Chicago crime data on
+    zipcode. Write the data out to a CSV for use in analysis.
+
+    Inputs:
+      args (from command line)
+
+    Returns:
+      writes out full merged dataset to output path
     '''
-    crime = pd.read_csv(crime_data)
-    crime.loc[:, 'block_fix'] = crime['block'].str[:3] + '00' + crime['block'].str[5:]
-    crime.loc[:, 'block_fix'] = crime['block_fix'].str.strip('0')
+    usage = ("python acs.py <merged_output_path>"
+             "<acs_output_path> <crime_input_data>")
+    if len(sys.argv) != 4:
+        print(usage)
+        sys.exit(1)
 
-    crime['url'] = "https://geocoding.geo.census.gov/geocoder/geographies/address?street=" + \
-        crime['block_fix'].str.split(' ').apply(lambda x: "+".join(x)) + "&city=Chicago&state=IL&benchmark=Public_AR_Census2010" + \
-        "&vintage=Census2010_Census2010&layers=14&format=json"
+    merged_output_path = args[1]
+    acs_output_path = args[2]
+    crime_data = args[3]
 
-    crime['tract_fix'] = crime['url'].apply(lambda x: extract_tract(x))
+    acs_data = pull_acs_data()
+    acs_data.to_csv(acs_output_path, header=True, index=False)
 
-    return crime
+    crime_df = pd.read_csv(crime_data)
+    crime_df['zipcode'] = crime_df['zipcode'].astype(str)
+    final_data = crime_df.merge(acs_data, how='left', on='zipcode')
+
+    final_data.to_csv(merged_output_path, header=True, index=False)
 
 
-def extract_tract(url):
-    '''
-    '''
-    result = pd.read_json(url)
-    location_dict = result.loc['addressMatches']['result']
-    if location_dict:
-        return location_dict[0]['geographies']['Census Blocks'][0]['TRACT']
-    else:
-        return "N/A"
-
+if __name__ == "__main__":
+    go(sys.argv)
+    
