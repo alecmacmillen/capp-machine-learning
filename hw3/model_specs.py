@@ -5,9 +5,9 @@ thresholds = [0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.5]
 # KNN
 knn_dict = {'model': neighbors.KNeighborsClassifier(),
             'name': 'KNN',
-            'params': {'metric': ['minkowski'],
-                       'n_neighbors': [50],
-                       'weights': ['uniform']}}
+            'params': {'metric': ['minkowski','euclidean'],
+                       'n_neighbors': [25,50,100],
+                       'weights': ['uniform','distance']}}
 
 # Logistic regression
 lr_dict = {'model': linear_model.LogisticRegression(),
@@ -25,9 +25,9 @@ dtree_dict = {'model': tree.DecisionTreeClassifier(),
 # SVM
 svm_dict = {'model': svm.SVC(),
             'name': 'SVM',
-            'params': {'C': [1.0],
+            'params': {'C': [1.0, 0.5, 0.1],
                        'kernel': ['rbf'],
-                       'max_iter': [5],
+                       'max_iter': [10, 5, -1],
                        'probability':[True]}}
 
 # Random forest
